@@ -82,8 +82,6 @@ func loadState(db dbm.DB, key []byte) *State {
 	v := s.loadValidators(s.LastBlockHeight)
 	if v != nil {
 		s.lastHeightValidatorsChanged = v.LastHeightChanged
-	} else {
-		s.lastHeightValidatorsChanged = 1
 	}
 
 	return s
@@ -248,6 +246,7 @@ func GetState(stateDB dbm.DB, genesisFile string) *State {
 	state := LoadState(stateDB)
 	if state == nil {
 		state = MakeGenesisStateFromFile(stateDB, genesisFile)
+		state.SaveValidators()
 		state.Save()
 	}
 
@@ -349,6 +348,5 @@ func MakeGenesisState(db dbm.DB, genDoc *types.GenesisDoc) *State {
 		LastValidators:  types.NewValidatorSet(nil),
 		AppHash:         genDoc.AppHash,
 		TxIndexer:       &null.TxIndex{}, // we do not need indexer during replay and in tests
-		// lastHeightValidatorsChanged: 1,
 	}
 }

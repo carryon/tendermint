@@ -7,9 +7,17 @@ import (
 	"github.com/tendermint/tendermint/types"
 )
 
-func Validators() (*ctypes.ResultValidators, error) {
-	blockHeight, validators := consensusState.GetValidators()
-	return &ctypes.ResultValidators{blockHeight, validators}, nil
+func Validators(height *int) (*ctypes.ResultValidators, error) {
+	if height == nil {
+		blockHeight, validators := consensusState.GetValidators()
+		return &ctypes.ResultValidators{blockHeight, validators}, nil
+	}
+	state := consensusState.GetState()
+	validators, err := state.LoadValidators(*height)
+	if err != nil {
+		return nil, err
+	}
+	return &ctypes.ResultValidators{*height, validators.Validators}, nil
 }
 
 func DumpConsensusState() (*ctypes.ResultDumpConsensusState, error) {
