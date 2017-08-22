@@ -37,7 +37,7 @@ func BlockchainInfo(minHeight, maxHeight int) (*ctypes.ResultBlockchainInfo, err
 //-----------------------------------------------------------------------------
 
 func Block(height int) (*ctypes.ResultBlock, error) {
-	if height == 0 {
+	if height <= 0 {
 		return nil, fmt.Errorf("Height must be greater than 0")
 	}
 	if height > blockStore.Height() {
@@ -52,7 +52,7 @@ func Block(height int) (*ctypes.ResultBlock, error) {
 //-----------------------------------------------------------------------------
 
 func Commit(height int) (*ctypes.ResultCommit, error) {
-	if height == 0 {
+	if height <= 0 {
 		return nil, fmt.Errorf("Height must be greater than 0")
 	}
 	storeHeight := blockStore.Height()
