@@ -82,6 +82,8 @@ func loadState(db dbm.DB, key []byte) *State {
 	v := s.loadValidators(s.LastBlockHeight)
 	if v != nil {
 		s.lastHeightValidatorsChanged = v.LastHeightChanged
+	} else {
+		s.lastHeightValidatorsChanged = 1
 	}
 
 	return s
@@ -141,18 +143,20 @@ func (s *State) LoadABCIResponses() *ABCIResponses {
 	return abciResponses
 }
 
-// SaveValidators persists the validator set to disk. If the validator set did not change in the latest block,
-// only the last height in which the validators changed is persisted.
+// SaveValidators persists the validator set for the next block to disk.
+// It should be called after the validator set is updated with the results of EndBlock.
+// If the validator set did not change after processing the latest block,
+// only the last height for which the validators changed is persisted.
 func (s *State) SaveValidators() {
 	lastHeight := s.lastHeightValidatorsChanged
-	thisHeight := s.LastBlockHeight
+	nextHeight := s.LastBlockHeight + 1
 	v := &Validators{
 		LastHeightChanged: lastHeight,
 	}
-	if lastHeight == thisHeight {
+	if lastHeight == nextHeight {
 		v.ValidatorSet = s.Validators
 	}
-	s.db.SetSync(calcValidatorsKey(thisHeight), v.Bytes())
+	s.db.SetSync(calcValidatorsKey(nextHeight), v.Bytes())
 }
 
 // LoadValidators loads the ValidatorSet for a given height.
@@ -164,6 +168,9 @@ func (s *State) LoadValidators(height int) (*types.ValidatorSet, error) {
 
 	if v.ValidatorSet == nil {
 		v = s.loadValidators(v.LastHeightChanged)
+		if v == nil {
+			return nil, ErrNoValSetForHeight{height}
+		}
 	}
 
 	return v.ValidatorSet, nil
@@ -211,7 +218,8 @@ func (s *State) SetBlockAndValidators(header *types.Header, blockPartsHeader typ
 			s.logger.Error("Error changing validator set", "err", err)
 			// TODO: err or carry on?
 		}
-		s.lastHeightValidatorsChanged = header.Height
+		// change results from this height but only applies to the next height
+		s.lastHeightValidatorsChanged = header.Height + 1
 	}
 
 	// Update validator accums and set state variables
@@ -246,7 +254,7 @@ func GetState(stateDB dbm.DB, genesisFile string) *State {
 	state := LoadState(stateDB)
 	if state == nil {
 		state = MakeGenesisStateFromFile(stateDB, genesisFile)
-		state.SaveValidators()
+		state.SaveValidators() // save the validators right away for height 1
 		state.Save()
 	}
 
@@ -338,15 +346,16 @@ func MakeGenesisState(db dbm.DB, genDoc *types.GenesisDoc) *State {
 	}
 
 	return &State{
-		db:              db,
-		GenesisDoc:      genDoc,
-		ChainID:         genDoc.ChainID,
-		LastBlockHeight: 0,
-		LastBlockID:     types.BlockID{},
-		LastBlockTime:   genDoc.GenesisTime,
-		Validators:      types.NewValidatorSet(validators),
-		LastValidators:  types.NewValidatorSet(nil),
-		AppHash:         genDoc.AppHash,
-		TxIndexer:       &null.TxIndex{}, // we do not need indexer during replay and in tests
+		db:                          db,
+		GenesisDoc:                  genDoc,
+		ChainID:                     genDoc.ChainID,
+		LastBlockHeight:             0,
+		LastBlockID:                 types.BlockID{},
+		LastBlockTime:               genDoc.GenesisTime,
+		Validators:                  types.NewValidatorSet(validators),
+		LastValidators:              types.NewValidatorSet(nil),
+		AppHash:                     genDoc.AppHash,
+		TxIndexer:                   &null.TxIndex{}, // we do not need indexer during replay and in tests
+		lastHeightValidatorsChanged: 1,
 	}
 }

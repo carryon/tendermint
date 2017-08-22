@@ -81,19 +81,30 @@ func TestValidatorsSaveLoad(t *testing.T) {
 	state := GetState(stateDB, config.GenesisFile())
 	state.SetLogger(log.TestingLogger())
 
-	state.LastBlockHeight += 1
+	// cant load anything for height 0
+	v, err := state.LoadValidators(0)
+	assert.NotNil(err, "expected err at height 0")
 
+	// should be able to load for height 1
+	v, err = state.LoadValidators(1)
+	assert.Nil(err, "expected no err at height 1")
+	assert.Equal(v.Hash(), state.Validators.Hash(), "expected validator hashes to match")
+
+	// increment height, save; should be able to load for next height
+	state.LastBlockHeight += 1
 	state.SaveValidators()
-	v, err := state.LoadValidators(state.LastBlockHeight)
+	v, err = state.LoadValidators(state.LastBlockHeight + 1)
 	assert.Nil(err, "expected no err")
 	assert.Equal(v.Hash(), state.Validators.Hash(), "expected validator hashes to match")
 
+	// increment height, save; should be able to load for next height
 	state.LastBlockHeight += 10
 	state.SaveValidators()
-	v, err = state.LoadValidators(state.LastBlockHeight)
+	v, err = state.LoadValidators(state.LastBlockHeight + 1)
 	assert.Nil(err, "expected no err")
 	assert.Equal(v.Hash(), state.Validators.Hash(), "expected validator hashes to match")
 
-	_, err = state.LoadValidators(state.LastBlockHeight + 1)
+	// should be able to load for next next height
+	_, err = state.LoadValidators(state.LastBlockHeight + 2)
 	assert.NotNil(err, "expected err")
 }

@@ -230,6 +230,8 @@ func (s *State) ApplyBlock(eventCache types.Fireable, proxyAppConn proxy.AppConn
 
 	// now update the block and validators
 	s.SetBlockAndValidators(block.Header, partsHeader, abciResponses)
+
+	// save the validators for the next block now that we know them
 	s.SaveValidators()
 
 	// lock mempool, commit state, update mempoool
